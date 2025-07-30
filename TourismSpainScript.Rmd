@@ -1,0 +1,665 @@
+---
+title: "Tourism in Spain Script"
+author: "Nicolás Jiménez Muñoz and Aina Vila Arbusà"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=5, fig.height=3, out.width = "100%", fig.align = 'center', dev='pdf')
+```
+
+```{r}
+series = ts(read.table("EntradTur.dat")[,1]/1000000, start = 2000, freq=12)
+plot(series, main="Tourist arrivals in Spain", ylab = "Millions")
+abline(v=1999:2019, lty=3, col=4)
+```
+
+```{r}
+years <- floor(time(series))
+
+# Compute mean and variance for each year
+m <- tapply(series, years, mean, na.rm = TRUE)
+v <- tapply(series, years, var, na.rm = TRUE)
+
+boxplot(series~floor(time(series)))
+```
+
+```{r, fig.width=7, fig.height=3, out.width="100%", fig.align='center'}
+par(mfrow = c(1, 2))
+# logarithmic transformation
+lnseries = log(series)
+plot(lnseries)
+years2 <- floor(time(lnseries))
+
+# Compute mean and variance for each year
+m <- tapply(lnseries, years2, mean, na.rm = TRUE)
+v <- tapply(lnseries, years2, var, na.rm = TRUE)
+
+boxplot(lnseries~floor(time(lnseries)))
+```
+
+```{r, fig.width=7, fig.height=3, out.width="100%", fig.align='center'}
+par(mfrow = c(1, 3))
+monthplot(lnseries)
+
+# seasonal difference
+d12lnseries = diff(lnseries, 12)
+monthplot(d12lnseries)
+plot(d12lnseries)
+```
+
+```{r}
+var(lnseries)
+var(d12lnseries)
+var(diff(d12lnseries)) # reg diff
+```
+
+```{r}
+library(forecast)
+model = auto.arima(d12lnseries)
+summary(model)
+```
+
+```{r}
+# log + seas diff + reg diff
+d1d12lnseries = diff(d12lnseries)
+plot(d12lnseries)
+```
+
+```{r}
+acf(d1d12lnseries, ylim=c(-1, 1), lag.max=6*12, lwd = 2, col = c(2, rep(1, 11))) 
+  # red lag = multiple of seasonal comp.
+pacf(d1d12lnseries, ylim=c(-1, 1),lag.max=6*12, lwd = 2, col = c(rep(1, 11), 2))
+```
+
+```{r}
+(mod1 <- arima(d1d12lnseries, order = c(2,0,0), seasonal = list(order = c(2,0,0),  period=12)))
+
+(mod2 <- arima(d1d12lnseries, order = c(0,0,4), seasonal = list(order = c(1,0,0), period=12)))
+
+(mod3 <- arima(d1d12lnseries, order = c(2,0,0), seasonal = list(order = c(1,0,0), period=12)))
+
+(mod4 <- arima(d1d12lnseries, order = c(0,0,4), seasonal = list(order = c(0,0,1), period=12)))
+
+(mod5 <- arima(d1d12lnseries, order = c(2,0,0), seasonal = list(order = c(0,0,1), period=12)))
+```
+
+```{r}
+check_intercept <- function(model, model_name) {
+  if (!"intercept" %in% names(coef(model))) {
+    return("No intercept estimated")
+  }
+  estimate <- coef(model)["intercept"]
+  se <- sqrt(diag(vcov(model)))["intercept"]
+  t_value <- estimate / se
+  decision <- ifelse(abs(t_value) > 2,
+                     paste(model_name, ": Reject H0: Significant"), 
+                     paste(model_name, ": Do not reject H0: Not significant"))
+  return(decision)
+}
+
+# Mean significance for each model
+check_intercept(mod1, "mod1")
+check_intercept(mod2, "mod2")
+check_intercept(mod3, "mod3")
+check_intercept(mod4, "mod4")
+check_intercept(mod5, "mod5")
+
+```
+
+```{r}
+(mod1 <- arima(lnseries, order = c(2,1,0), seasonal = list(order = c(2,1,0),  period=12)))
+
+(mod2 <- arima(lnseries, order = c(0,1,4), seasonal = list(order = c(1,1,0), period=12)))
+
+(mod3 <- arima(lnseries, order = c(2,1,0), seasonal = list(order = c(1,1,0), period=12)))
+
+(mod4 <- arima(lnseries, order = c(0,1,4), seasonal = list(order = c(0,1,1), period=12)))
+
+(mod5 <- arima(lnseries, order = c(2,1,0), seasonal = list(order = c(0,1,1), period=12)))
+```
+
+```{r}
+# MODEL 1 T-VALUES
+coefs_m1 <- mod1$coef
+se_m1 <- sqrt(diag(mod1$var.coef))
+t_values_m1 <- coefs_m1 / se_m1
+t_values_m1_table <- data.frame(T_Value = t_values_m1)
+print(t_values_m1_table)
+
+# MODEL 2 T-VALUES
+coefs_m2 <- mod2$coef
+se_m2 <- sqrt(diag(mod2$var.coef))
+t_values_m2 <- coefs_m2 / se_m2
+t_values_m2_table <- data.frame(T_Value = t_values_m2)
+print(t_values_m2_table)
+
+# MODEL 3 T-VALUES
+coefs_m3 <- mod3$coef
+se_m3 <- sqrt(diag(mod3$var.coef))
+t_values_m3 <- coefs_m3 / se_m3
+t_values_m3_table <- data.frame(T_Value = t_values_m3)
+print(t_values_m3_table)
+
+# MODEL 4 T-VALUES
+coefs_m4 <- mod4$coef
+se_m4 <- sqrt(diag(mod4$var.coef))
+t_values_m4 <- coefs_m4 / se_m4
+t_values_m4_table <- data.frame(T_Value = t_values_m4)
+print(t_values_m4_table)
+
+# MODEL 5 T-VALUES
+coefs_m5 <- mod5$coef
+se_m5 <- sqrt(diag(mod5$var.coef))
+t_values_m5 <- coefs_m5 / se_m5
+t_values_m5_table <- data.frame(T_Value = t_values_m5)
+print(t_values_m5_table)
+
+```
+
+```{r}
+# Re-estimation for coefficients significance
+
+# Remove MA(3)
+(mod2_2 <- arima(lnseries, order = c(0,1,4), 
+               seasonal = list(order = c(1,1,0), period=12), 
+               fixed = c(NA, NA, 0, NA, NA)))
+# Remove MA(2)
+(mod4_2 <- arima(lnseries, order = c(0,1,4), 
+               seasonal = list(order = c(0,1,1),  period=12), 
+               fixed = c(NA, 0, NA, NA, NA)))
+```
+
+```{r, warning= FALSE}
+# T-test with re-estimations
+
+# MODEL 2_2 T-VALUES
+coefs_m2_2 <- mod2_2$coef
+se_m2_2 <- sqrt(diag(mod2_2$var.coef))
+t_values_m2_2 <- coefs_m2_2 / se_m2_2
+t_values_m2_2_table <- data.frame(T_Value = t_values_m2_2)
+print(t_values_m2_2_table)
+
+# MODEL 4_2 T-VALUES
+coefs_m4_2 <- mod4_2$coef
+se_m4_2 <- sqrt(diag(mod4_2$var.coef))
+t_values_m4_2 <- coefs_m4_2 / se_m4_2
+t_values_m4_2_table <- data.frame(T_Value = t_values_m4_2)
+print(t_values_m4_2_table)
+```
+
+```{r}
+# Re-estimation for coefficients significance
+
+# Model 2: Remove MA(4)
+(mod2_3 <- arima(lnseries, order = c(0,1,2), 
+               seasonal = list(order = c(1,1,0), period=12)))
+# Model 4: Remove MA(3)
+(mod4_3 <- arima(lnseries, order = c(0,1,4), 
+               seasonal = list(order = c(0,1,1),  period=12), 
+               fixed = c(NA, 0, 0, NA, NA)))
+```
+
+```{r, warning= FALSE}
+# T-test with new re-estimations
+
+# MODEL 2_3 T-VALUES
+coefs_m2_3 <- mod2_3$coef
+se_m2_3 <- sqrt(diag(mod2_3$var.coef))
+t_values_m2_3 <- coefs_m2_3 / se_m2_3
+t_values_m2_3_table <- data.frame(T_Value = t_values_m2_3)
+print(t_values_m2_3_table)
+
+# MODEL 4_3 T-VALUES
+coefs_m4_3 <- mod4_3$coef
+se_m4_3 <- sqrt(diag(mod4_3$var.coef))
+t_values_m4_3 <- coefs_m4_3 / se_m4_3
+t_values_m4_3_table <- data.frame(T_Value = t_values_m4_3)
+print(t_values_m4_3_table)
+```
+
+```{r, fig.height=2}
+# ARIMA: (2, 1, 0)(2, 1, 0)_{12} 
+par(mfrow = c(1,3))
+plot(residuals(mod1))
+abline(h = 0)
+abline(h=c(-3, 3)*sd(residuals(mod1)), col = 4, lty = 3)
+# ARIMA: (2, 1, 0)(1, 1, 0)_{12}
+plot(residuals(mod3))
+abline(h = 0)
+abline(h=c(-3, 3)*sd(residuals(mod3)), col = 4, lty = 3)
+# ARIMA: (2, 1, 0)(0, 1, 1)_{12}
+plot(residuals(mod5))
+abline(h = 0)
+abline(h=c(-3, 3)*sd(residuals(mod5)), col = 4, lty = 3)
+```
+
+```{r, fig.height=2}
+par(mfrow = c(1,3))
+
+# ARIMA: (2, 1, 0)(2, 1, 0)_{12} RESIDUALS PLOTS
+scatter.smooth(sqrt(abs(residuals(mod1))), lpars = list(col=2))
+
+# ARIMA: (2, 1, 0)(1, 1, 0)_{12}
+scatter.smooth(sqrt(abs(residuals(mod3))), lpars = list(col=2))
+
+# ARIMA: (2, 1, 0)(0, 1, 1)_{12}
+scatter.smooth(sqrt(abs(residuals(mod5))), lpars = list(col=2))
+```
+ 
+```{r, fig.height=2}
+par(mfrow = c(1,3))
+
+# ARIMA: (2, 1, 0)(2, 1, 0)_{12} RESIDUALS PLOTS
+qqnorm(resid(mod1))
+qqline(resid(mod1), col = 2, lwd = 2)
+
+# ARIMA: (2, 1, 0)(1, 1, 0)_{12}
+qqnorm(resid(mod3))
+qqline(resid(mod3), col = 2, lwd = 2)
+
+# ARIMA: (2, 1, 0)(0, 1, 1)_{12}
+qqnorm(resid(mod5))
+qqline(resid(mod5), col = 2, lwd = 2)
+```
+
+```{r, fig.height=2}
+par(mfrow = c(1,3))
+
+# ARIMA: (2, 1, 0)(2, 1, 0)_{12} RESIDUALS PLOTS
+hist(resid(mod1),breaks=20, freq=FALSE)
+curve(dnorm(x, mean=mean(resid(mod1)), sd=sd(resid(mod1))), col=2, add=T)
+
+# ARIMA: (2, 1, 0)(1, 1, 0)_{12}
+hist(resid(mod3),breaks=20, freq=FALSE)
+curve(dnorm(x, mean=mean(resid(mod3)), sd=sd(resid(mod3))), col=2, add=T)
+
+# ARIMA: (2, 1, 0)(0, 1, 1)_{12}
+hist(resid(mod5),breaks=20, freq=FALSE)
+curve(dnorm(x, mean=mean(resid(mod5)), sd=sd(resid(mod5))), col=2, add=T)
+```
+
+```{r, fig.height=2}
+# ARIMA: (2, 1, 0)(2, 1, 0)_{12} 
+shapiro.test(resid(mod1))
+
+# ARIMA: (2, 1, 0)(1, 1, 0)_{12}
+shapiro.test(resid(mod3))
+
+# ARIMA: (2, 1, 0)(0, 1, 1)_{12}
+shapiro.test(resid(mod5))
+```
+
+```{r}
+# ARIMA: (2, 1, 0)(2, 1, 0)_{12} 
+par(mfrow=c(1,2))
+acf(resid(mod1), ylim=c(-1, 1), lag.max=72, lwd = 2, col = c(2, rep(1, 11)))
+pacf(resid(mod1), ylim= c(-1, 1), lag.max = 72, lwd = 2, col = c(2, rep(1, 11), 2))
+
+# ARIMA: (2, 1, 0)(1, 1, 0)_{12}
+par(mfrow=c(1,2))
+acf(resid(mod3), ylim=c(-1, 1), lag.max=72, lwd = 2, col = c(2, rep(1, 11)))
+pacf(resid(mod3), ylim= c(-1, 1), lag.max = 72, lwd = 2, col = c(2, rep(1, 11), 2))
+
+# ARIMA: (2, 1, 0)(0, 1, 1)_{12}
+par(mfrow=c(1,2))
+acf(resid(mod5), ylim=c(-1, 1), lag.max=72, lwd = 2, col = c(2, rep(1, 11)))
+pacf(resid(mod5), ylim= c(-1, 1), lag.max = 72, lwd = 2, col = c(2, rep(1, 11), 2))
+```
+
+```{r, fig.width=7, fig.height=5}
+# ARIMA: (2, 1, 0)(2, 1, 0)_{12} 
+tsdiag(mod1,gof.lag=72)
+
+# ARIMA: (2, 1, 0)(1, 1, 0)_{12}
+tsdiag(mod3,gof.lag=72)
+
+# ARIMA: (2, 1, 0)(0, 1, 1)_{12}
+tsdiag(mod5,gof.lag=72)
+```
+
+```{r}
+Mod(polyroot(c(1, -mod1$model$phi))) # AR PART
+Mod(polyroot(c(1, mod1$model$theta))) # MA PART
+
+library(forecast)
+plot(mod1)
+```
+
+```{r}
+Mod(polyroot(c(1, -mod3$model$phi))) # AR PART
+Mod(polyroot(c(1, mod3$model$theta))) # MA PART
+
+plot(mod3)
+```
+
+```{r}
+Mod(polyroot(c(1, -mod5$model$phi))) # AR PART
+Mod(polyroot(c(1, mod5$model$theta))) # MA PART
+
+plot(mod5)
+```
+
+```{r}
+data.frame(
+  Model = c("Model 1", "Model 3", "Model 5"),
+  AIC = c(AIC(mod1), AIC(mod3), AIC(mod5)),
+  BIC = c(BIC(mod1), BIC(mod3), BIC(mod5))
+)
+```
+
+```{r}
+# Cutoff setting
+last = c(2017, 11)
+serie2 = window(series, end = last)
+lnserie2 = log(serie2)
+
+# Full observed series
+obs = window(series, start = 2018)
+```
+
+```{r}
+# Function to evaluate a model
+evaluate_model <- function(mod) {
+  
+  pre <- predict(mod, n.ahead = 12)
+  
+  ll <- exp(pre$pred - 1.96 * pre$se)
+  pr <- exp(pre$pred)
+  ul <- exp(pre$pred + 1.96 * pre$se)
+  
+  RMSE = sqrt(mean((obs-pr)^2))
+  MAE = mean(abs(obs-pr))
+  RMSPE <- sqrt(mean((((obs) - pr) / (obs))^2))
+  MAPE <- mean(abs((obs) - pr) / (obs))
+  
+  mean_width <- mean(ul - ll)
+  
+  list(model = mod, RMSE = RMSE, MAE = MAE, RMSPE = RMSPE, MAPE = MAPE, mean_width = mean_width,
+       pred = pr, ll = ll, ul = ul)
+}
+```
+
+```{r}
+# Models info
+get_model_stats <- function(full_model, cut_model) {
+  list(
+    AIC_full = AIC(full_model),
+    AIC_cut = AIC(cut_model),
+    sigma2_full = full_model$sigma2,
+    sigma2_cut = cut_model$sigma2
+  )
+}
+```
+
+```{r}
+# Models without the last 12 observations
+mod1_cut <- arima(lnserie2, order = c(2, 1, 0), 
+                  seasonal = list(order = c(2, 1, 0), period = 12))
+
+mod3_cut <- arima(lnserie2, order = c(2, 1, 0), 
+                  seasonal = list(order = c(1, 1, 0), period = 12))
+
+mod5_cut <- arima(lnserie2, order = c(2, 1, 0), 
+                  seasonal = list(order = c(0, 1, 1), period = 12))
+
+# Get models info (cut vs full)
+stats_mod1 <- get_model_stats(mod1, mod1_cut)
+stats_mod3 <- get_model_stats(mod3, mod3_cut)
+stats_mod5 <- get_model_stats(mod5, mod5_cut)
+
+# Forecasting accuracy 
+res_mod1 = evaluate_model(mod1_cut)
+res_mod3 = evaluate_model(mod3_cut)
+res_mod5 = evaluate_model(mod5_cut)
+```
+
+```{r, fig.width=7, fig.height=2, out.width="100%", fig.align='center'}
+par(mfrow = c(1, 3))
+
+# Model 1
+ts.plot(series, res_mod1$ll, res_mod1$ul, res_mod1$pred,
+        lty = c(1, 2, 2, 1), col = c(1, 4, 4, 2),
+        xlim = c(2014, 2019), type = "o", 
+        main = "Forecast Mod1")
+abline(v = 2014:2019, lty = 3, col = 4)
+
+# Model 3
+ts.plot(series, res_mod3$ll, res_mod3$ul, res_mod3$pred,
+        lty = c(1, 2, 2, 1), col = c(1, 4, 4, 2),
+        xlim = c(2014, 2019), type = "o", 
+        main = "Forecast Mod3")
+abline(v = 2014:2019, lty = 3, col = 4)
+
+# Model 5
+ts.plot(series, res_mod5$ll, res_mod5$ul, res_mod5$pred,
+        lty = c(1, 2, 2, 1), col = c(1, 4, 4, 2),
+        xlim = c(2014, 2019), type = "o", 
+        main = "Forecast Mod5")
+abline(v = 2014:2019, lty = 3, col = 4)
+```
+
+```{r}
+(metrics_table <- data.frame(
+  Model = c("ARIMA(2,1,0)(2,1,0)[12]",
+            "ARIMA(2,1,0)(1,1,0)[12]",
+            "ARIMA(2,1,0)(0,1,1)[12]"),
+  AIC_full = c(stats_mod1$AIC_full, stats_mod3$AIC_full, stats_mod5$AIC_full),
+  AIC_cut = c(stats_mod1$AIC_cut, stats_mod3$AIC_cut, stats_mod5$AIC_cut),
+  sigma2_full = c(stats_mod1$sigma2_full, stats_mod3$sigma2_full, stats_mod5$sigma2_full),
+  sigma2_cut = c(stats_mod1$sigma2_cut, stats_mod3$sigma2_cut, stats_mod5$sigma2_cut),
+  RMSE = c(res_mod1$RMSE, res_mod3$RMSE, res_mod5$RMSE),
+  MAE = c(res_mod1$MAE, res_mod3$MAE, res_mod5$MAE),
+  RMSPE = c(res_mod1$RMSPE, res_mod3$RMSPE, res_mod5$RMSPE),
+  MAPE = c(res_mod1$MAPE, res_mod3$MAPE, res_mod5$MAPE),
+  Mean_CI_Width = c(res_mod1$mean_width, res_mod3$mean_width, res_mod5$mean_width)
+))
+```
+
+```{r}
+future <- predict(mod1, n.ahead = 12)
+ll_future <- exp(future$pred - 1.96*future$se)
+ul_future <- exp(future$pred + 1.96*future$se)
+pr_future <- exp(future$pred)
+
+ts.plot(series, ll_future, ul_future, pr_future, lty = c(1, 2, 2, 1), 
+        col = c(1, 4, 4, 2), type = "o",
+        xlim = c(2014, 2020)) 
+
+abline(v = 2014:2020, lty = 3, col = 4)
+```
+```{r}
+(forecast_2019 <- data.frame(
+  Date = seq.Date(from = as.Date("2019-12-01"), by = "month", length.out = 12),  # Adjust the starting date
+  Forecast = pr_future,
+  Lower_Bound = ll_future,
+  Upper_Bound = ul_future
+))
+```
+
+```{r}
+source("CalendarEffects.R")
+
+# Calendar regressors with initial full series (longer than needed)
+start = c(1999, 1, 300)
+vEa = Weaster(start) # Easter effect
+vTD = Wtrad(start) # Traditional calendar effects
+
+# Align regressors with lnseries time window
+vEa <- window(vEa, start = start(lnseries), end = end(lnseries))
+vTD <- window(vTD, start = start(lnseries), end = end(lnseries))
+
+modEaTD=arima(lnseries, order=c(2,1,0),
+              seasonal=list(order=c(2,1,0),period=12),
+              xreg=data.frame(vEa,vTD))
+
+modEa=arima(lnseries, order=c(2,1,0),
+              seasonal=list(order=c(2,1,0),period=12),
+              xreg=data.frame(vEa))
+
+modTD=arima(lnseries, order=c(2,1,0),
+              seasonal=list(order=c(2,1,0),period=12),
+              xreg=data.frame(vTD))
+
+# MODEL 1 CALENDAR EFFECTS T-VALUES
+coefs_m <- modEaTD$coef
+se_m <- sqrt(diag(modEaTD$var.coef))
+t_values_m <- coefs_m / se_m
+t_values_m_table <- data.frame(T_Value = t_values_m)
+print(t_values_m_table)
+
+mod3EaTD=arima(lnseries, order=c(2,1,0),
+              seasonal=list(order=c(1,1,0),period=12),
+              xreg=data.frame(vEa,vTD))
+
+lnser_star = lnseries - coef(mod3EaTD)["vEa"]*vEa - coef(mod3EaTD)["vTD"]*vTD
+plot(series)
+lines(exp(lnser_star), col = 2)
+
+d1d12lnser_star = diff(diff(lnser_star, 12))
+
+# Final model definition
+(mod3EaTD=arima(lnser_star, order=c(2,1,0),
+              seasonal=list(order=c(1,1,0),period=12)))
+```
+
+```{r}
+source("atipics2.R")
+mod.out = outdetec(mod3EaTD, c(1, 12), crit = 2.9, LS = T)
+
+outliers = mod.out$atip[order(mod.out$atip[,1]),]
+months = c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+data.frame(outliers,
+           date = paste(months[(outliers[,1]-1)%%12+1],start(lnser_star)[1]+((outliers[,1]- 1 + 1)%/%12)),
+           PercVar=exp(outliers[,3])*100)
+```
+ 
+```{r}
+lnseriesEC.lin = lineal(lnser_star, mod.out$atip)
+series.lin = exp(lnseriesEC.lin)
+
+plot(lnser_star)
+lines(lnseriesEC.lin,col=2)
+```
+
+```{r}
+par(mfrow = c(1, 2))
+plot(lnser_star - lnseriesEC.lin)
+
+d1d12lnserieEC.lin=diff(diff(lnseriesEC.lin,12))
+plot(d1d12lnserieEC.lin)
+abline(h=0)
+```
+
+```{r}
+acf(d1d12lnserieEC.lin, ylim=c(-1, 1), lag.max=6*12, lwd = 2, col = c(2, rep(1, 11))) 
+  # red lag = multiple of seasonal comp.
+
+pacf(d1d12lnserieEC.lin, ylim=c(-1, 1),lag.max=6*12, lwd = 2, col = c(rep(1, 11), 2))
+```
+
+```{r}
+mod3EaTD.lin= arima(d1d12lnserieEC.lin,order=c(2,0,0),
+            seasonal=list(order=c(1,0,0),period=12))
+
+check_intercept(mod3EaTD.lin, "mod3EaTD.lin")
+```
+
+```{r}
+(mod3EaTD.lin <- arima(lnseriesEC.lin, order = c(2,1,0), seasonal = list(order = c(1,1,0),  period=12)))
+```
+
+```{r}
+coefs_mod.lin <- mod3EaTD.lin$coef
+se_mod.lin <- sqrt(diag(mod3EaTD.lin$var.coef))
+t_values_mod.lin <- coefs_mod.lin / se_mod.lin
+t_values_mod.lin_table <- data.frame(T_Value = t_values_mod.lin)
+print(t_values_mod.lin_table)
+```
+
+```{r}
+par(mfrow = c(1,2))
+plot(residuals(mod3EaTD.lin))
+abline(h = 0)
+abline(h=c(-3, 3)*sd(residuals(mod3EaTD.lin)), col = 4, lty = 3)
+
+scatter.smooth(sqrt(abs(residuals(mod3EaTD.lin))), lpars = list(col=2))
+```
+
+```{r}
+par(mfrow = c(1,2))
+
+qqnorm(resid(mod3EaTD.lin))
+qqline(resid(mod3EaTD.lin), col = 2, lwd = 2)
+
+hist(resid(mod3EaTD.lin),breaks=20, freq=FALSE)
+curve(dnorm(x, mean=mean(resid(mod3EaTD.lin)), sd=sd(resid(mod3EaTD.lin))), col=2, add=T)
+
+shapiro.test(resid(mod3EaTD.lin))
+```
+
+```{r}
+par(mfrow=c(1,2))
+acf(resid(mod3EaTD.lin), ylim=c(-1, 1), lag.max=72, lwd = 2, col = c(2, rep(1, 11)))
+pacf(resid(mod3EaTD.lin), ylim= c(-1, 1), lag.max = 72, lwd = 2, col = c(2, rep(1, 11), 2))
+```
+```{r, fig.width=7, fig.height=5}
+tsdiag(mod3EaTD.lin,gof.lag=72)
+```
+ 
+```{r}
+Mod(polyroot(c(1, -mod3EaTD.lin$model$phi))) # AR PART
+Mod(polyroot(c(1, mod3EaTD.lin$model$theta))) # MA PART
+
+plot(mod3EaTD.lin)
+```
+
+```{r}
+# Cutoff setting: the linearized series
+end = c(2017, 11)
+serie2.lin = window(lnseriesEC.lin, end = end)
+
+# Full observed series
+obs = window(series, start = 2018)
+
+mod3EaTD.lin_cut <- arima(serie2.lin, order = c(2, 1, 0), 
+                  seasonal = list(order = c(1, 1, 0), period = 12))
+
+# Forecasting accuracy 
+res_mod3EaTD.lin = evaluate_model(mod3EaTD.lin_cut)
+stats_mod3EaTD.lin = get_model_stats(mod3EaTD.lin, mod3EaTD.lin_cut)
+
+(metrics_table <- data.frame(
+  Model = c("ARIMA(2,1,0)(1,1,0)[12]",
+            "CLEAN ARIMA(2,1,0)(1,1,0)[12]"),
+  AIC_full = c(stats_mod1$AIC_full, stats_mod3EaTD.lin$AIC_full),
+  AIC_cut = c(stats_mod1$AIC_cut, stats_mod3EaTD.lin$AIC_cut),
+  sigma2_full = c(stats_mod1$sigma2_full, stats_mod3EaTD.lin$sigma2_full),
+  sigma2_cut = c(stats_mod1$sigma2_cut, stats_mod3EaTD.lin$sigma2_cut),
+  RMSE = c(res_mod1$RMSE, res_mod3EaTD.lin$RMSE),
+  MAE = c(res_mod1$MAE, res_mod3EaTD.lin$MAE),
+  RMSPE = c(res_mod1$RMSPE, res_mod3EaTD.lin$RMSPE),
+  MAPE = c(res_mod1$MAPE, res_mod3EaTD.lin$MAPE),
+  Mean_CI_Width = c(res_mod1$mean_width, res_mod3EaTD.lin$mean_width)
+))
+```
+
+```{r, fig.width=7}
+future2 <- predict(mod3EaTD.lin, n.ahead = 12)
+ll_future2 <- exp(future2$pred - 1.96*future2$se)
+ul_future2 <- exp(future2$pred + 1.96*future2$se)
+pr_future2 <- exp(future2$pred)
+
+par(mfrow = c(1, 2))
+ts.plot(series, ll_future2, ul_future2, pr_future2, lty = c(1, 2, 2, 1), 
+        col = c(1, 4, 4, 2), type = "o",
+        xlim = c(2014, 2020)) 
+
+abline(v = 2014:2020, lty = 3, col = 4)
+
+ts.plot(series, ll_future, ul_future, pr_future, lty = c(1, 2, 2, 1), 
+        col = c(1, 4, 4, 2), type = "o",
+        xlim = c(2014, 2020)) 
+
+abline(v = 2014:2020, lty = 3, col = 4)
+```
