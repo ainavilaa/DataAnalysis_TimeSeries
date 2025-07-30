@@ -18,10 +18,9 @@ The Box-Jenkins methodology is a systematic approach for modeling time series da
 ## Project Contents
 
 This repository includes the following components:
-- **Report**: The final report summarizing the analysis, reults, and conclusions following the Box-Jenkins methodology.
+- **Report**: The final report summarizing the analysis, results, and conclusions following the Box-Jenkins methodology.
 - **Annex**: Supplementary materials and additional figures referenced in the report. 
-- **Script**: The complete R script used for preprocessing, modeling, validation and forecasting. 
-
+- **Script**: The complete R script used for preprocessing, modelling, validation and forecasting. 
 - **Original Dataset**
 
 ## Authors
